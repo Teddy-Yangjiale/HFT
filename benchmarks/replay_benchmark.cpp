@@ -1,5 +1,6 @@
 #include "hft/exchange/simulated_exchange.hpp"
 #include "hft/market_data/csv_market_data.hpp"
+#include "hft/market_data/sequence_gap_detector.hpp"
 #include "hft/metrics/latency_stats.hpp"
 #include "hft/oms/order_manager.hpp"
 #include "hft/order_book/book.hpp"
@@ -53,9 +54,14 @@ int main(int argc, char** argv) {
         hft::OrderManager oms(risk);
         hft::SimulatedExchange exchange;
         hft::FixedSpreadMarketMaker strategy(symbol, 1, 1);
+        hft::SequenceGapDetector gap_detector;
 
         for (const auto& event : events) {
             const auto event_start = Clock::now();
+
+            if (gap_detector.observe(event)) {
+                continue;
+            }
 
             book.apply(event);
 

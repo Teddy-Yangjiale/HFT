@@ -1,13 +1,16 @@
 #include "hft/exchange/simulated_exchange.hpp"
 #include "hft/market_data/csv_market_data.hpp"
+#include "hft/market_data/sequence_gap_detector.hpp"
 #include "hft/metrics/latency_stats.hpp"
 #include "hft/oms/order_manager.hpp"
 #include "hft/order_book/book.hpp"
+#include "hft/replay/market_event_journal.hpp"
 #include "hft/risk/risk_engine.hpp"
 #include "hft/strategy/fixed_spread_market_maker.hpp"
 
 #include <cassert>
 #include <filesystem>
+#include <vector>
 
 namespace {
 
@@ -72,6 +75,41 @@ void test_latency_stats() {
     assert(summary.p50_ns == 20);
 }
 
+void test_sequence_gap_detector() {
+    hft::SequenceGapDetector detector;
+
+    const auto first = detector.observe({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 100, 1, 1, 10});
+    assert(!first.has_value());
+
+    const auto second = detector.observe({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 101, 1, 2, 11});
+    assert(!second.has_value());
+
+    const auto gap = detector.observe({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 102, 1, 3, 13});
+    assert(gap.has_value());
+    assert(gap->expected == 12);
+    assert(gap->actual == 13);
+}
+
+void test_market_event_journal_round_trip() {
+    const std::vector<hft::MarketEvent> events{
+        {hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 100, 5, 1, 1},
+        {hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 101, 6, 2, 2},
+    };
+
+    const auto path = std::filesystem::temp_directory_path() / "hft_market_event_journal_test.bin";
+    hft::MarketEventJournal journal;
+    journal.write(path, events);
+    const auto restored = journal.read(path);
+    std::filesystem::remove(path);
+
+    assert(restored.size() == events.size());
+    assert(restored[0].symbol == "BTCUSDT");
+    assert(restored[0].side == hft::Side::Buy);
+    assert(restored[0].price == 100);
+    assert(restored[1].side == hft::Side::Sell);
+    assert(restored[1].quantity == 6);
+}
+
 } // namespace
 
 int main() {
@@ -80,5 +118,7 @@ int main() {
     test_strategy_and_simulated_fill();
     test_csv_reader();
     test_latency_stats();
+    test_sequence_gap_detector();
+    test_market_event_journal_round_trip();
     return 0;
 }

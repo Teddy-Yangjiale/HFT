@@ -14,8 +14,10 @@ add_library(hft_core
     src/book.cpp
     src/csv_market_data.cpp
     src/fixed_spread_market_maker.cpp
+    src/market_event_journal.cpp
     src/order_manager.cpp
     src/risk_engine.cpp
+    src/sequence_gap_detector.cpp
     src/simulated_exchange.cpp
 )
 

@@ -17,6 +17,8 @@ This is currently an engineering MVP, not a production trading stack. The code i
 - Simulated exchange fill model
 - Latency summary utility for local benchmarks
 - Replay benchmark executable
+- Sequence gap detector before order book mutation
+- Binary normalized market event journal for deterministic replay
 - Unit-style smoke tests through CTest
 
 ## Current Gaps
@@ -25,9 +27,10 @@ The biggest gaps versus a real high-frequency trading system are:
 
 1. **Market data correctness**
    - No live adapter yet.
-   - No packet gap detection beyond the sequence field being present.
+   - Basic sequence gap detection exists, but recovery is still manual.
    - No snapshot recovery.
    - The order book applies absolute CSV quantities only.
+   - No raw packet capture, so feed adapter bugs cannot yet be replayed from original exchange bytes.
 
 2. **Order management**
    - No cancel/replace workflow.
@@ -49,10 +52,22 @@ The biggest gaps versus a real high-frequency trading system are:
    - Latency stats are in-memory raw samples; production telemetry should use bounded histograms.
 
 6. **Operations**
-   - No persistent binary journal.
+   - Binary normalized event journal exists, but raw packet capture is not implemented.
    - No structured audit log.
    - No metrics exporter.
    - No process supervisor, config hot reload, or emergency control plane.
+
+## Industrial-Grade Difference
+
+An industrial HFT stack is not just faster code. It is a controlled system where every state transition can be explained under packet loss, venue disconnects, duplicate fills, clock drift, risk-limit changes, and process restarts. The main differences are:
+
+- **Feed handling:** production systems validate sequence numbers, detect gaps before book mutation, recover from snapshots, and preserve raw packets for postmortems.
+- **Time discipline:** production systems record exchange, NIC, kernel, application receive, decision, send, ack, and fill timestamps with known clock synchronization quality.
+- **OMS correctness:** production systems treat every order transition as a state-machine event, deduplicate exchange messages, reconcile after reconnect, and preserve audit trails.
+- **Risk as hard infrastructure:** production systems enforce position, open-order exposure, message-rate limits, cancel-rate limits, loss limits, fat-finger checks, and kill switches before order send.
+- **Simulation realism:** production-grade research uses queue position, latency, maker/taker fees, partial fills, cancels, rejects, and adverse selection instead of top-of-book crossing only.
+- **Operational control:** production deployments include metrics, alerting, configuration control, runbooks, process supervision, credential isolation, and disaster recovery.
+- **Performance validation:** production latency work is measurement-led, using release builds, CPU pinning, profiling, cache-aware structures, bounded allocations, and native Linux hardware tests.
 
 ## Build
 
@@ -73,7 +88,7 @@ ctest --test-dir build-wsl --output-on-failure
 Expected sample output:
 
 ```text
-events=6 orders=10 fills=0 position=0 top_bid=100002 top_ask=100008
+events=6 orders=10 fills=0 gaps=0 position=0 top_bid=100002 top_ask=100008
 ```
 
 ## Benchmark
@@ -146,13 +161,14 @@ Comments should explain system contracts, latency tradeoffs, and correctness ass
 
 The next engineering milestones should be:
 
-1. Add a binary event journal for deterministic replay and audit.
-2. Extend OMS with cancel/replace and execution ID deduplication.
-3. Add open-order exposure, rate limits, and kill switches to risk.
-4. Replace the current fill model with a queue-position-aware simulator.
-5. Replace `std::map` order book internals with a cache-friendlier price ladder after benchmarks justify it.
-6. Add structured metrics output for replay and paper trading.
-7. Add one real market data adapter while keeping the normalized event boundary unchanged.
+1. Add raw packet capture next to the normalized journal for adapter debugging.
+2. Add snapshot recovery and explicit trading halt behavior after sequence gaps.
+3. Extend OMS with cancel/replace and execution ID deduplication.
+4. Add open-order exposure, rate limits, and kill switches to risk.
+5. Replace the current fill model with a queue-position-aware simulator.
+6. Replace `std::map` order book internals with a cache-friendlier price ladder after benchmarks justify it.
+7. Add structured metrics output for replay and paper trading.
+8. Add one real market data adapter while keeping the normalized event boundary unchanged.
 
 ## Roadmap
 

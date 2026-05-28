@@ -1,5 +1,6 @@
 #include "hft/exchange/simulated_exchange.hpp"
 #include "hft/market_data/csv_market_data.hpp"
+#include "hft/market_data/sequence_gap_detector.hpp"
 #include "hft/oms/order_manager.hpp"
 #include "hft/order_book/book.hpp"
 #include "hft/risk/risk_engine.hpp"
@@ -20,9 +21,19 @@ int main(int argc, char** argv) {
     hft::OrderManager oms(risk);
     hft::SimulatedExchange exchange;
     hft::FixedSpreadMarketMaker strategy(symbol, 1, 1);
+    hft::SequenceGapDetector gap_detector;
 
     std::size_t fills = 0;
+    std::size_t gaps = 0;
     for (const auto& event : events) {
+        if (const auto gap = gap_detector.observe(event)) {
+            ++gaps;
+            std::cerr << "sequence_gap symbol=" << gap->symbol
+                      << " expected=" << gap->expected
+                      << " actual=" << gap->actual << '\n';
+            continue;
+        }
+
         book.apply(event);
         for (const auto& request : strategy.on_market_event(event, book)) {
             auto order = oms.submit(request);
@@ -41,6 +52,7 @@ int main(int argc, char** argv) {
     std::cout << "events=" << events.size()
               << " orders=" << oms.order_count()
               << " fills=" << fills
+              << " gaps=" << gaps
               << " position=" << risk.position(symbol);
 
     if (top.bid_price && top.ask_price) {
