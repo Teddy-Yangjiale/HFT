@@ -13,10 +13,11 @@ public:
     virtual ~Strategy() = default;
 
     // Strategies consume normalized market events and the current local book,
-    // then emit desired order requests. They should not know whether execution is
-    // simulated, paper-traded, or live; that separation is what makes deterministic
-    // replay and paper trading possible.
-    [[nodiscard]] virtual auto on_market_event(const MarketEvent& event, const OrderBook& book) -> std::vector<OrderRequest> = 0;
+    // then append desired order requests into caller-owned storage. Caller-owned
+    // output keeps the hot path allocation-aware: the event loop can reserve once
+    // and reuse the same buffer for every tick instead of constructing a fresh
+    // vector on each market event.
+    virtual void on_market_event(const MarketEvent& event, const OrderBook& book, std::vector<OrderRequest>& output) = 0;
 };
 
 } // namespace hft

@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -52,9 +53,12 @@ int main(int argc, char** argv) {
         hft::OrderBook book(symbol);
         hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_price = 10'000'000'000});
         hft::OrderManager oms(risk);
+        oms.reserve_orders(events.size() * 2);
         hft::SimulatedExchange exchange;
         hft::FixedSpreadMarketMaker strategy(symbol, 1, 1);
         hft::SequenceGapDetector gap_detector;
+        std::vector<hft::OrderRequest> order_requests;
+        order_requests.reserve(2);
 
         for (const auto& event : events) {
             const auto event_start = Clock::now();
@@ -66,11 +70,12 @@ int main(int argc, char** argv) {
             book.apply(event);
 
             const auto strategy_start = Clock::now();
-            const auto requests = strategy.on_market_event(event, book);
+            order_requests.clear();
+            strategy.on_market_event(event, book, order_requests);
             const auto strategy_end = Clock::now();
             strategy_latency.observe(elapsed_ns(strategy_start, strategy_end));
 
-            for (const auto& request : requests) {
+            for (const auto& request : order_requests) {
                 auto order = oms.submit(request);
                 ++total_orders;
 

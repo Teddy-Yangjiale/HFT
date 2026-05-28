@@ -25,6 +25,7 @@ public:
 
     [[nodiscard]] auto get(OrderId id) const -> std::optional<Order>;
     [[nodiscard]] auto order_count() const -> std::size_t;
+    void reserve_orders(std::size_t count);
 
 private:
     RiskEngine& risk_;

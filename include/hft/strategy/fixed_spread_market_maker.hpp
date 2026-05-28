@@ -10,7 +10,7 @@ class FixedSpreadMarketMaker final : public Strategy {
 public:
     FixedSpreadMarketMaker(std::string symbol, Quantity order_qty, Price edge_ticks);
 
-    [[nodiscard]] auto on_market_event(const MarketEvent& event, const OrderBook& book) -> std::vector<OrderRequest> override;
+    void on_market_event(const MarketEvent& event, const OrderBook& book, std::vector<OrderRequest>& output) override;
 
 private:
     std::string symbol_;

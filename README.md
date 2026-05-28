@@ -6,6 +6,8 @@ C++20 high-frequency trading system MVP. This repository starts with a small, de
 
 This is currently an engineering MVP, not a production trading stack. The code is useful for building the core loop, replay discipline, and latency measurement habits before connecting real capital.
 
+For a concise record of the project's architecture and implementation highlights, see [TECHNICAL_HIGHLIGHTS.md](TECHNICAL_HIGHLIGHTS.md).
+
 ## Current MVP
 
 - CSV market data replay
@@ -19,6 +21,8 @@ This is currently an engineering MVP, not a production trading stack. The code i
 - Replay benchmark executable
 - Sequence gap detector before order book mutation
 - Binary normalized market event journal for deterministic replay
+- Allocation-aware strategy output buffer
+- OMS order-map capacity reservation for benchmarks/replay
 - Unit-style smoke tests through CTest
 
 ## Current Gaps
@@ -47,7 +51,8 @@ The biggest gaps versus a real high-frequency trading system are:
    - It does not model queue position, latency, fees, maker/taker behavior, partial queue depletion, or adverse selection.
 
 5. **Performance engineering**
-   - `std::map`, `std::vector`, and virtual strategy dispatch are acceptable for the MVP but not final hot-path choices.
+   - `std::map` order book internals and virtual strategy dispatch are acceptable for the MVP but not final hot-path choices.
+   - Strategy output now reuses caller-owned storage, but a fixed-capacity buffer would be tighter than `std::vector`.
    - No CPU pinning, memory pool, fixed-capacity queues, or NUMA policy is wired into the runtime yet.
    - Latency stats are in-memory raw samples; production telemetry should use bounded histograms.
 

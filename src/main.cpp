@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <vector>
 
 int main(int argc, char** argv) {
     const std::filesystem::path market_data_path = argc > 1 ? argv[1] : "data/sample_market_data.csv";
@@ -22,6 +23,8 @@ int main(int argc, char** argv) {
     hft::SimulatedExchange exchange;
     hft::FixedSpreadMarketMaker strategy(symbol, 1, 1);
     hft::SequenceGapDetector gap_detector;
+    std::vector<hft::OrderRequest> order_requests;
+    order_requests.reserve(2);
 
     std::size_t fills = 0;
     std::size_t gaps = 0;
@@ -35,7 +38,9 @@ int main(int argc, char** argv) {
         }
 
         book.apply(event);
-        for (const auto& request : strategy.on_market_event(event, book)) {
+        order_requests.clear();
+        strategy.on_market_event(event, book, order_requests);
+        for (const auto& request : order_requests) {
             auto order = oms.submit(request);
             if (auto fill = exchange.match(order, book, event.exchange_ts_ns)) {
                 oms.fill(*fill);

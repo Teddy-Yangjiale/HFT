@@ -38,7 +38,9 @@ void test_strategy_and_simulated_fill() {
     book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 104, 5, 2, 2});
 
     hft::FixedSpreadMarketMaker strategy("BTCUSDT", 1, 1);
-    const auto requests = strategy.on_market_event({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 104, 5, 2, 2}, book);
+    std::vector<hft::OrderRequest> requests;
+    requests.reserve(2);
+    strategy.on_market_event({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 104, 5, 2, 2}, book, requests);
     assert(requests.size() == 2);
     assert(requests[0].price == 101);
     assert(requests[1].price == 103);

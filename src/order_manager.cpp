@@ -53,4 +53,8 @@ auto OrderManager::order_count() const -> std::size_t {
     return orders_.size();
 }
 
+void OrderManager::reserve_orders(std::size_t count) {
+    orders_.reserve(count);
+}
+
 } // namespace hft
