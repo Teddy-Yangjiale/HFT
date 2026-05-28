@@ -35,6 +35,12 @@ add_executable(hft_replay_app
 
 target_link_libraries(hft_replay_app PRIVATE hft_core)
 
+add_executable(hft_benchmark_app
+    benchmarks/replay_benchmark.cpp
+)
+
+target_link_libraries(hft_benchmark_app PRIVATE hft_core)
+
 enable_testing()
 
 add_executable(hft_tests

@@ -1,5 +1,6 @@
 #include "hft/exchange/simulated_exchange.hpp"
 #include "hft/market_data/csv_market_data.hpp"
+#include "hft/metrics/latency_stats.hpp"
 #include "hft/oms/order_manager.hpp"
 #include "hft/order_book/book.hpp"
 #include "hft/risk/risk_engine.hpp"
@@ -57,6 +58,20 @@ void test_csv_reader() {
     assert(events.front().symbol == "BTCUSDT");
 }
 
+void test_latency_stats() {
+    hft::LatencyStats stats;
+    stats.observe(10);
+    stats.observe(30);
+    stats.observe(20);
+
+    const auto summary = stats.summary();
+    assert(summary.count == 3);
+    assert(summary.min_ns == 10);
+    assert(summary.max_ns == 30);
+    assert(summary.mean_ns == 20);
+    assert(summary.p50_ns == 20);
+}
+
 } // namespace
 
 int main() {
@@ -64,5 +79,6 @@ int main() {
     test_risk_rejects_large_order();
     test_strategy_and_simulated_fill();
     test_csv_reader();
+    test_latency_stats();
     return 0;
 }
