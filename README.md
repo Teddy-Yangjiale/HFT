@@ -24,6 +24,7 @@ For a concise record of the project's architecture and implementation highlights
 - Allocation-aware strategy output buffer
 - OMS order-map capacity reservation for benchmarks/replay
 - Risk hardening stage 1: open-order exposure, order-rate limit, global/symbol kill switches
+- OMS state machine stage 2: cancel, cancel-replace, execution ID deduplication
 - Unit-style smoke tests through CTest
 
 ## Current Gaps
@@ -38,9 +39,9 @@ The biggest gaps versus a real high-frequency trading system are:
    - No raw packet capture, so feed adapter bugs cannot yet be replayed from original exchange bytes.
 
 2. **Order management**
-   - No cancel/replace workflow.
+   - Basic cancel and cancel-replace workflows exist.
    - No exchange order ID mapping.
-   - No execution ID deduplication.
+   - Execution ID deduplication exists for fills that provide venue execution IDs.
    - No gateway session state, sequence numbers, heartbeats, or reconnect logic.
 
 3. **Risk**
@@ -189,12 +190,19 @@ Still needed:
 
 ### Stage 2: OMS State Machine
 
-Planned:
+Status: in progress.
 
-- Explicit cancel workflow.
-- Replace/amend workflow.
+Implemented:
+
+- Explicit cancel workflow for active orders.
+- Cancel-replace workflow that cancels the old local order and submits a new one.
+- Execution ID deduplication for fill idempotency.
+- Overfill guard that caps fills to remaining order quantity.
+
+Still needed:
+
 - Exchange order ID mapping.
-- Execution ID deduplication.
+- In-place amend support for venues that preserve order priority.
 - Reconnect reconciliation hooks.
 - State-transition tests for every legal and illegal transition.
 

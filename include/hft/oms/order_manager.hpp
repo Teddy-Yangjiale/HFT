@@ -4,7 +4,9 @@
 #include "hft/risk/risk_engine.hpp"
 
 #include <optional>
+#include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace hft {
 
@@ -18,9 +20,12 @@ public:
     [[nodiscard]] auto submit(const OrderRequest& request) -> Order;
     void accept(OrderId id);
     void reject(OrderId id);
+    [[nodiscard]] auto cancel(OrderId id) -> bool;
+    [[nodiscard]] auto replace(OrderId id, const OrderRequest& replacement) -> std::optional<Order>;
 
-    // fill() is idempotency-sensitive in a real OMS. The MVP assumes each fill is
-    // unique; the next milestone should track execution IDs to reject duplicates.
+    // fill() uses execution_id for idempotency when the venue supplies one. Empty
+    // execution IDs are accepted for simulator compatibility but cannot be
+    // deduplicated, so live gateways should always populate the field.
     void fill(const Fill& fill);
 
     [[nodiscard]] auto get(OrderId id) const -> std::optional<Order>;
@@ -31,6 +36,7 @@ private:
     RiskEngine& risk_;
     OrderId next_id_{1};
     std::unordered_map<OrderId, Order> orders_;
+    std::unordered_set<std::string> seen_execution_ids_;
 };
 
 } // namespace hft

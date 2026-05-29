@@ -44,7 +44,7 @@ void test_risk_tracks_open_order_exposure() {
     assert(second.status == hft::OrderStatus::Rejected);
     assert(risk.open_buy_quantity("BTCUSDT") == 2);
 
-    oms.fill({first.id, "BTCUSDT", hft::Side::Buy, 100, 1, 102});
+    oms.fill({first.id, "exec-1", "BTCUSDT", hft::Side::Buy, 100, 1, 102});
     assert(risk.open_buy_quantity("BTCUSDT") == 1);
     assert(risk.position("BTCUSDT") == 1);
 }
@@ -74,6 +74,70 @@ void test_risk_kill_switches() {
 
     risk.set_global_kill_switch(true);
     assert(!risk.check({"ETHUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 3}).accepted);
+}
+
+void test_oms_cancel_releases_exposure() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 10, .max_price = 1'000});
+    hft::OrderManager oms(risk);
+
+    const auto order = oms.submit({"BTCUSDT", hft::Side::Sell, hft::OrderType::Limit, 101, 3, 10});
+    assert(order.status == hft::OrderStatus::Accepted);
+    assert(risk.open_sell_quantity("BTCUSDT") == 3);
+
+    assert(oms.cancel(order.id));
+    assert(risk.open_sell_quantity("BTCUSDT") == 0);
+
+    const auto cancelled = oms.get(order.id);
+    assert(cancelled.has_value());
+    assert(cancelled->status == hft::OrderStatus::Cancelled);
+    assert(!oms.cancel(order.id));
+}
+
+void test_oms_replace_cancel_replaces_with_new_order() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 10, .max_price = 1'000});
+    hft::OrderManager oms(risk);
+
+    const auto original = oms.submit({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 2, 10});
+    const auto replacement = oms.replace(original.id, {"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 99, 4, 11});
+
+    assert(replacement.has_value());
+    assert(replacement->id != original.id);
+    assert(replacement->status == hft::OrderStatus::Accepted);
+    assert(risk.open_buy_quantity("BTCUSDT") == 4);
+
+    const auto old = oms.get(original.id);
+    assert(old.has_value());
+    assert(old->status == hft::OrderStatus::Cancelled);
+}
+
+void test_oms_execution_id_dedup() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 10, .max_price = 1'000});
+    hft::OrderManager oms(risk);
+
+    const auto order = oms.submit({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 5, 10});
+    oms.fill({order.id, "exec-duplicate", "BTCUSDT", hft::Side::Buy, 100, 2, 11});
+    oms.fill({order.id, "exec-duplicate", "BTCUSDT", hft::Side::Buy, 100, 2, 12});
+
+    const auto updated = oms.get(order.id);
+    assert(updated.has_value());
+    assert(updated->filled == 2);
+    assert(risk.position("BTCUSDT") == 2);
+    assert(risk.open_buy_quantity("BTCUSDT") == 3);
+}
+
+void test_oms_caps_overfill_to_remaining_quantity() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 10, .max_price = 1'000});
+    hft::OrderManager oms(risk);
+
+    const auto order = oms.submit({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 3, 10});
+    oms.fill({order.id, "exec-overfill", "BTCUSDT", hft::Side::Buy, 100, 5, 11});
+
+    const auto updated = oms.get(order.id);
+    assert(updated.has_value());
+    assert(updated->filled == 3);
+    assert(updated->status == hft::OrderStatus::Filled);
+    assert(risk.position("BTCUSDT") == 3);
+    assert(risk.open_buy_quantity("BTCUSDT") == 0);
 }
 
 void test_strategy_and_simulated_fill() {
@@ -164,6 +228,10 @@ int main() {
     test_risk_tracks_open_order_exposure();
     test_risk_order_rate_limit();
     test_risk_kill_switches();
+    test_oms_cancel_releases_exposure();
+    test_oms_replace_cancel_replaces_with_new_order();
+    test_oms_execution_id_dedup();
+    test_oms_caps_overfill_to_remaining_quantity();
     test_strategy_and_simulated_fill();
     test_csv_reader();
     test_latency_stats();

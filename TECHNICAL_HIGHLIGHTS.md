@@ -112,6 +112,29 @@ Key files:
 - `src/risk_engine.cpp`
 - `src/order_manager.cpp`
 
+### OMS State Machine Progress
+
+The OMS now supports active-order cancel, cancel-replace, and execution ID deduplication.
+
+Why this matters:
+
+- Cancel releases remaining open-order exposure immediately.
+- Cancel-replace gives strategies a safe way to reprice without mutating an order record in place.
+- Duplicate fills with the same venue execution ID are ignored, which is required after reconnects or gateway retries.
+- Fills are capped to remaining quantity, preventing overfill corruption in local state.
+
+Current limitations:
+
+- Exchange order IDs are not mapped yet.
+- Replace is implemented as cancel plus new local order, not in-place amend.
+- There is no reconnect reconciliation flow yet.
+
+Key files:
+
+- `include/hft/oms/order_manager.hpp`
+- `src/order_manager.cpp`
+- `tests/test_main.cpp`
+
 ### Measurement-Led Optimization
 
 The project includes a benchmark app and latency summary utility. Optimizations should be judged against repeatable measurements, not intuition.
@@ -229,6 +252,17 @@ event_loop p50=145ns
 event_loop p95=181ns
 strategy p50=38ns
 ```
+
+Recent local WSL2 baseline after Stage 2 OMS state-machine additions:
+
+```text
+events_per_second=3189362
+event_loop p50=188ns
+event_loop p95=374ns
+strategy p50=47ns
+```
+
+The Stage 2 result includes additional OMS idempotency and state checks. The next performance work should recover throughput by replacing unordered hot-path structures with bounded, cache-friendlier storage where the expected ID ranges are known.
 
 This is a useful directionally positive result, not a final latency claim. WSL2 scheduling noise and the tiny sample feed make exact numbers unstable, so future benchmark reports should include multiple pinned Release runs.
 

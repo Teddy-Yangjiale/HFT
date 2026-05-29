@@ -35,6 +35,7 @@ struct Order {
 // realized position in risk.
 struct Fill {
     OrderId order_id{0};
+    std::string execution_id;
     std::string symbol;
     Side side{Side::Buy};
     Price price{0};

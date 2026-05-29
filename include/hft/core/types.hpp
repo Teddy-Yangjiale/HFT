@@ -24,6 +24,8 @@ enum class OrderStatus {
     New,
     Accepted,
     PartiallyFilled,
+    CancelPending,
+    ReplacePending,
     Filled,
     Cancelled,
     Rejected
@@ -41,6 +43,10 @@ inline auto status_to_string(OrderStatus status) -> const char* {
         return "ACCEPTED";
     case OrderStatus::PartiallyFilled:
         return "PARTIALLY_FILLED";
+    case OrderStatus::CancelPending:
+        return "CANCEL_PENDING";
+    case OrderStatus::ReplacePending:
+        return "REPLACE_PENDING";
     case OrderStatus::Filled:
         return "FILLED";
     case OrderStatus::Cancelled:
