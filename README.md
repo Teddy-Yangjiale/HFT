@@ -23,6 +23,7 @@ For a concise record of the project's architecture and implementation highlights
 - Binary normalized market event journal for deterministic replay
 - Allocation-aware strategy output buffer
 - OMS order-map capacity reservation for benchmarks/replay
+- Risk hardening stage 1: open-order exposure, order-rate limit, global/symbol kill switches
 - Unit-style smoke tests through CTest
 
 ## Current Gaps
@@ -43,8 +44,8 @@ The biggest gaps versus a real high-frequency trading system are:
    - No gateway session state, sequence numbers, heartbeats, or reconnect logic.
 
 3. **Risk**
-   - Current checks cover single-order size, position, and price sanity.
-   - Missing open-order exposure, order-rate limits, cancel-rate limits, max loss, symbol kill switch, and global kill switch.
+   - Current checks cover single-order size, price sanity, position, open-order exposure, order-rate limits, and kill switches.
+   - Missing cancel-rate limits, max loss, account-level risk, strategy-level risk, and persistent kill-switch control.
 
 4. **Simulation quality**
    - The simulated exchange only fills crossing orders at top of book.
@@ -162,18 +163,79 @@ Comments should explain system contracts, latency tradeoffs, and correctness ass
 - Explain whether a method is allowed to allocate, block, log, or perform I/O.
 - Explain simulation limitations so backtest results are not mistaken for live expectations.
 
-## Near-Term Build Plan
+## Upgrade Plan
 
-The next engineering milestones should be:
+The project will be upgraded in this order. Each stage should preserve replay determinism, tests, and benchmark coverage.
 
-1. Add raw packet capture next to the normalized journal for adapter debugging.
-2. Add snapshot recovery and explicit trading halt behavior after sequence gaps.
-3. Extend OMS with cancel/replace and execution ID deduplication.
-4. Add open-order exposure, rate limits, and kill switches to risk.
-5. Replace the current fill model with a queue-position-aware simulator.
-6. Replace `std::map` order book internals with a cache-friendlier price ladder after benchmarks justify it.
-7. Add structured metrics output for replay and paper trading.
-8. Add one real market data adapter while keeping the normalized event boundary unchanged.
+### Stage 1: Risk Hardening
+
+Status: in progress.
+
+Implemented:
+
+- Open-order exposure tracking by symbol and side.
+- Order-rate limit using a timestamp window.
+- Global kill switch.
+- Symbol-level kill switch.
+- OMS integration so accepted orders reserve exposure and fills/rejects release exposure.
+
+Still needed:
+
+- Cancel-rate limit.
+- Max loss limit.
+- Strategy-level kill switch.
+- Persistent operator control for kill-switch state.
+- Metrics for accepted/rejected orders by reason.
+
+### Stage 2: OMS State Machine
+
+Planned:
+
+- Explicit cancel workflow.
+- Replace/amend workflow.
+- Exchange order ID mapping.
+- Execution ID deduplication.
+- Reconnect reconciliation hooks.
+- State-transition tests for every legal and illegal transition.
+
+### Stage 3: Order Book Optimization
+
+Planned:
+
+- Replace `std::map` with a cache-friendly price ladder or flat book.
+- Keep the public `OrderBook::apply()` and `OrderBook::top()` API stable.
+- Benchmark old and new book implementations under Release builds.
+- Add gap/snapshot recovery hooks before mutation.
+
+### Stage 4: Queue-Position Simulator
+
+Planned:
+
+- Track queue position for resting orders.
+- Model partial fills from trade prints and level depletion.
+- Add maker/taker fee model.
+- Add configurable latency and cancel-failure behavior.
+- Report simulated fill confidence separately from realized live fills.
+
+### Stage 5: Market Data Upgrade
+
+Planned:
+
+- Raw packet journal next to normalized event journal.
+- Snapshot recovery after sequence gaps.
+- Explicit trading halt behavior when a book is unsafe.
+- Live adapter boundary for exchange/vendor feeds.
+- Feed latency timestamps: exchange, receive, normalize, book apply.
+
+### Stage 6: Paper Trading Adapter
+
+Planned:
+
+- Real exchange sandbox or paper gateway.
+- Gateway session heartbeat and reconnect.
+- Order ack/reject/fill mapping into OMS.
+- Credentials isolated from source code.
+- Paper-trading metrics and audit logs.
 
 ## Roadmap
 

@@ -12,6 +12,7 @@ struct OrderRequest {
     OrderType type{OrderType::Limit};
     Price price{0};
     Quantity quantity{0};
+    TimestampNs create_ts_ns{0};
 };
 
 // Order is the local source of truth for an order after the OMS accepts a client

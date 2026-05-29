@@ -25,8 +25,8 @@ void FixedSpreadMarketMaker::on_market_event(const MarketEvent& event, const Ord
         return;
     }
 
-    output.push_back(OrderRequest{symbol_, Side::Buy, OrderType::Limit, bid, order_qty_});
-    output.push_back(OrderRequest{symbol_, Side::Sell, OrderType::Limit, ask, order_qty_});
+    output.push_back(OrderRequest{symbol_, Side::Buy, OrderType::Limit, bid, order_qty_, event.exchange_ts_ns});
+    output.push_back(OrderRequest{symbol_, Side::Sell, OrderType::Limit, ask, order_qty_, event.exchange_ts_ns});
 }
 
 } // namespace hft

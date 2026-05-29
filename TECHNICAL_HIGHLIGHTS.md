@@ -89,6 +89,29 @@ Key files:
 - `include/hft/risk/risk_engine.hpp`
 - `src/risk_engine.cpp`
 
+### Stateful Risk Hardening
+
+The risk engine now tracks live position separately from open-order exposure and enforces order-rate windows plus kill switches.
+
+Why this matters:
+
+- A strategy cannot bypass position limits by stacking many outstanding orders before fills arrive.
+- Operators can stop all trading through a global kill switch.
+- A single unsafe symbol can be blocked through a symbol-level kill switch without stopping the whole process.
+- Order-rate checks are handled in the pre-trade path, before any gateway send.
+
+Current limitations:
+
+- Kill-switch state is in memory only.
+- Cancel-rate limits and max-loss limits are not implemented yet.
+- Risk rejection metrics are not exported yet.
+
+Key files:
+
+- `include/hft/risk/risk_engine.hpp`
+- `src/risk_engine.cpp`
+- `src/order_manager.cpp`
+
 ### Measurement-Led Optimization
 
 The project includes a benchmark app and latency summary utility. Optimizations should be judged against repeatable measurements, not intuition.
@@ -196,6 +219,15 @@ events_per_second=6258648
 event_loop p50=109ns
 event_loop p95=149ns
 strategy p50=34ns
+```
+
+Recent local WSL2 baseline after Stage 1 risk hardening:
+
+```text
+events_per_second=4811048
+event_loop p50=145ns
+event_loop p95=181ns
+strategy p50=38ns
 ```
 
 This is a useful directionally positive result, not a final latency claim. WSL2 scheduling noise and the tiny sample feed make exact numbers unstable, so future benchmark reports should include multiple pinned Release runs.

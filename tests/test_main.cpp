@@ -32,6 +32,50 @@ void test_risk_rejects_large_order() {
     assert(!decision.accepted);
 }
 
+void test_risk_tracks_open_order_exposure() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 2, .max_price = 1'000});
+    hft::OrderManager oms(risk);
+
+    const auto first = oms.submit({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 2, 100});
+    assert(first.status == hft::OrderStatus::Accepted);
+    assert(risk.open_buy_quantity("BTCUSDT") == 2);
+
+    const auto second = oms.submit({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 101});
+    assert(second.status == hft::OrderStatus::Rejected);
+    assert(risk.open_buy_quantity("BTCUSDT") == 2);
+
+    oms.fill({first.id, "BTCUSDT", hft::Side::Buy, 100, 1, 102});
+    assert(risk.open_buy_quantity("BTCUSDT") == 1);
+    assert(risk.position("BTCUSDT") == 1);
+}
+
+void test_risk_order_rate_limit() {
+    hft::RiskEngine risk({
+        .max_single_order_qty = 10,
+        .max_symbol_position = 100,
+        .max_open_order_qty = 100,
+        .max_price = 1'000,
+        .max_orders_per_window = 2,
+        .order_rate_window_ns = 100,
+    });
+
+    assert(risk.check({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 1'000}).accepted);
+    assert(risk.check({"BTCUSDT", hft::Side::Sell, hft::OrderType::Limit, 101, 1, 1'010}).accepted);
+    assert(!risk.check({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 1'020}).accepted);
+    assert(risk.check({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 1'200}).accepted);
+}
+
+void test_risk_kill_switches() {
+    hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_open_order_qty = 100, .max_price = 1'000});
+
+    risk.set_symbol_kill_switch("BTCUSDT", true);
+    assert(!risk.check({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 1}).accepted);
+    assert(risk.check({"ETHUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 2}).accepted);
+
+    risk.set_global_kill_switch(true);
+    assert(!risk.check({"ETHUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 1, 3}).accepted);
+}
+
 void test_strategy_and_simulated_fill() {
     hft::OrderBook book("BTCUSDT");
     book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 100, 5, 1, 1});
@@ -117,6 +161,9 @@ void test_market_event_journal_round_trip() {
 int main() {
     test_order_book_top();
     test_risk_rejects_large_order();
+    test_risk_tracks_open_order_exposure();
+    test_risk_order_rate_limit();
+    test_risk_kill_switches();
     test_strategy_and_simulated_fill();
     test_csv_reader();
     test_latency_stats();

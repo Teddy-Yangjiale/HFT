@@ -28,6 +28,9 @@ void OrderManager::accept(OrderId id) {
 
 void OrderManager::reject(OrderId id) {
     if (auto found = orders_.find(id); found != orders_.end()) {
+        if (found->second.status == OrderStatus::Accepted || found->second.status == OrderStatus::PartiallyFilled) {
+            risk_.release_open_order(found->second);
+        }
         found->second.status = OrderStatus::Rejected;
     }
 }
