@@ -25,6 +25,7 @@ For a concise record of the project's architecture and implementation highlights
 - OMS order-map capacity reservation for benchmarks/replay
 - Risk hardening stage 1: open-order exposure, order-rate limit, global/symbol kill switches
 - OMS state machine stage 2: cancel, cancel-replace, execution ID deduplication
+- Order book stage 3: contiguous flat price ladder replacing `std::map`
 - Unit-style smoke tests through CTest
 
 ## Current Gaps
@@ -53,7 +54,8 @@ The biggest gaps versus a real high-frequency trading system are:
    - It does not model queue position, latency, fees, maker/taker behavior, partial queue depletion, or adverse selection.
 
 5. **Performance engineering**
-   - `std::map` order book internals and virtual strategy dispatch are acceptable for the MVP but not final hot-path choices.
+   - Order book internals now use contiguous flat price ladders instead of `std::map`.
+   - Virtual strategy dispatch is acceptable for the MVP but not a final hot-path choice.
    - Strategy output now reuses caller-owned storage, but a fixed-capacity buffer would be tighter than `std::vector`.
    - No CPU pinning, memory pool, fixed-capacity queues, or NUMA policy is wired into the runtime yet.
    - Latency stats are in-memory raw samples; production telemetry should use bounded histograms.
@@ -208,12 +210,20 @@ Still needed:
 
 ### Stage 3: Order Book Optimization
 
-Planned:
+Status: in progress.
 
-- Replace `std::map` with a cache-friendly price ladder or flat book.
-- Keep the public `OrderBook::apply()` and `OrderBook::top()` API stable.
-- Benchmark old and new book implementations under Release builds.
-- Add gap/snapshot recovery hooks before mutation.
+Implemented:
+
+- Replaced `std::map` internals with contiguous flat price ladders.
+- Kept the public `OrderBook::apply()` and `OrderBook::top()` API stable.
+- Added tests for best-level delete, quantity update, and ask/bid sorting.
+- Benchmarked under Release builds.
+
+Still needed:
+
+- Fixed-capacity ladder option for known tick ranges.
+- Dedicated book-only microbenchmark separate from OMS/risk.
+- Snapshot recovery hooks before mutation.
 
 ### Stage 4: Queue-Position Simulator
 

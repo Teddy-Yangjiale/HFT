@@ -3,10 +3,9 @@
 #include "hft/core/market_event.hpp"
 #include "hft/core/types.hpp"
 
-#include <map>
 #include <optional>
 #include <string>
-#include <functional>
+#include <vector>
 
 namespace hft {
 
@@ -27,19 +26,29 @@ public:
     void apply(const MarketEvent& event);
 
     // Returns the best bid/ask without exposing the underlying map containers.
-    // Keeping this narrow API makes it easier to replace std::map with a faster
-    // fixed-depth ladder or flat array once profiling identifies the right shape.
+    // Keeping this narrow API made it possible to replace the original tree book
+    // with a flat ladder without touching strategies or simulators.
     [[nodiscard]] auto top() const -> TopOfBook;
     [[nodiscard]] auto symbol() const -> const std::string&;
 
 private:
+    struct PriceLevel {
+        Price price{0};
+        Quantity quantity{0};
+    };
+
+    using Levels = std::vector<PriceLevel>;
+
+    static void apply_level(Levels& levels, Price price, Quantity quantity, bool bid_side);
+
     std::string symbol_;
-    // std::map is deliberately chosen for correctness and readability in the
-    // first milestone. It is not the final data structure for a latency-sensitive
-    // production book, where price-indexed arrays or cache-aware flat maps are
-    // typically better.
-    std::map<Price, Quantity, std::greater<>> bids_;
-    std::map<Price, Quantity> asks_;
+
+    // Levels are stored in contiguous vectors: bids sorted high-to-low, asks
+    // sorted low-to-high. This avoids tree-node allocation and gives top() a
+    // cache-friendly front() read. For very deep books, a fixed price-indexed
+    // ladder can replace this without changing the public API.
+    Levels bids_;
+    Levels asks_;
 };
 
 } // namespace hft

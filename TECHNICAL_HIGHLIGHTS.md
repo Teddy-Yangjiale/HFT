@@ -206,6 +206,33 @@ Key files:
 - `include/hft/order_book/book.hpp`
 - `src/book.cpp`
 
+### Contiguous Flat Price Ladder
+
+Stage 3 replaced the original `std::map` order book internals with contiguous vectors of price levels:
+
+- bids sorted high-to-low
+- asks sorted low-to-high
+- `top()` reads the first level from each vector
+
+Why this matters:
+
+- Price levels live in contiguous memory instead of tree nodes.
+- Top-of-book access is a cheap front-of-vector read.
+- The public API stayed stable, so strategies and simulators did not change.
+- This is a practical intermediate step before a fixed-capacity tick-indexed ladder.
+
+Current limitations:
+
+- Insert/delete can shift vector elements.
+- Very deep books or very frequent mid-book churn may need a true fixed ladder.
+- Current end-to-end benchmark is dominated by OMS/risk work, so a dedicated book-only microbenchmark is needed to isolate book gains.
+
+Key files:
+
+- `include/hft/order_book/book.hpp`
+- `src/book.cpp`
+- `tests/test_main.cpp`
+
 ### Hot Path Comments Describe Contracts
 
 Comments focus on correctness assumptions and latency tradeoffs rather than restating syntax.
@@ -263,6 +290,17 @@ strategy p50=47ns
 ```
 
 The Stage 2 result includes additional OMS idempotency and state checks. The next performance work should recover throughput by replacing unordered hot-path structures with bounded, cache-friendlier storage where the expected ID ranges are known.
+
+Recent local WSL2 baseline after Stage 3 flat order book:
+
+```text
+events_per_second=3194162
+event_loop p50=199ns
+event_loop p95=355ns
+strategy p50=53ns
+```
+
+The Stage 3 end-to-end benchmark is roughly flat versus Stage 2 because the sample book is shallow and OMS/risk checks dominate the current loop. The flat ladder is still the right structural direction because it removes tree-node allocation from the book and preserves the public API for a future fixed-capacity ladder.
 
 This is a useful directionally positive result, not a final latency claim. WSL2 scheduling noise and the tiny sample feed make exact numbers unstable, so future benchmark reports should include multiple pinned Release runs.
 

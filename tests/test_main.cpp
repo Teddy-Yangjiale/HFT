@@ -26,6 +26,30 @@ void test_order_book_top() {
     assert(top.ask_price == 103);
 }
 
+void test_order_book_flat_ladder_updates_and_deletes() {
+    hft::OrderBook book("BTCUSDT");
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 100, 5, 1, 1});
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 102, 3, 2, 2});
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 101, 9, 3, 3});
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 102, 0, 4, 4});
+
+    auto top = book.top();
+    assert(top.bid_price == 101);
+    assert(top.bid_quantity == 9);
+
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Buy, 101, 7, 5, 5});
+    top = book.top();
+    assert(top.bid_price == 101);
+    assert(top.bid_quantity == 7);
+
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 105, 4, 6, 6});
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 103, 2, 7, 7});
+    book.apply({hft::MarketEventType::BookUpdate, "BTCUSDT", hft::Side::Sell, 104, 6, 8, 8});
+    top = book.top();
+    assert(top.ask_price == 103);
+    assert(top.ask_quantity == 2);
+}
+
 void test_risk_rejects_large_order() {
     hft::RiskEngine risk({.max_single_order_qty = 10, .max_symbol_position = 100, .max_price = 1'000});
     const auto decision = risk.check({"BTCUSDT", hft::Side::Buy, hft::OrderType::Limit, 100, 11});
@@ -224,6 +248,7 @@ void test_market_event_journal_round_trip() {
 
 int main() {
     test_order_book_top();
+    test_order_book_flat_ladder_updates_and_deletes();
     test_risk_rejects_large_order();
     test_risk_tracks_open_order_exposure();
     test_risk_order_rate_limit();
